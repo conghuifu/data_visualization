@@ -1,0 +1,144 @@
+<html>
+<meta charset="utf-8">
+
+<head>
+
+</head>
+<style type="text/css">
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+</style>
+<body>
+</body>
+<script src="d3/d3.v3.js"></script>
+<script>
+
+
+var margin={top:70, right:100, bottom:100, left:70},
+    w=1000-margin.left-margin.right,
+    h=600-margin.top-margin.bottom;
+
+var SquareLength=20;
+var SquareSpace=5;
+var xScale,yScale;
+var xAxis,yAxis;
+var svg=d3.select("body")
+		  .append("svg")
+		  .attr("width",w+margin.left+margin.right)
+		  .attr("height",h+margin.top+margin.bottom)
+		  .append("g")
+		  .attr("transform","translate("+margin.left+","+margin.top+")");
+
+var color=["#000080","#008000","#00FFFF","#663399","#778899","#D2691E","#CD5C5C","#FFB6C1","#FFD700","#FF00FF","#C0C0C0","#DEB887"];
+
+var month=d3.scale.ordinal()
+				  .domain(["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"])
+				  .range(color);
+
+var legend=svg.selectAll(".legend")
+			  .data(month.domain())
+			  .enter()
+			  .append("g")
+			  .attr("class","legend")
+			  .attr("transform",function(d,i){ return "translate("+(w+SquareLength+20) +","+ (i*(SquareLength+SquareSpace)) + ")";});//?
+
+legend.append("rect")
+	  .attr("width",SquareLength)
+	  .attr("height",SquareLength)
+	  .style("fill",function(d){
+	  	return month(d);
+	  });
+
+legend.append("text")
+	  .attr("x",SquareLength+SquareSpace)
+	  .attr("y",SquareSpace+SquareLength-10)
+	  .attr('stroke',"black" )
+	  .attr("stroke-width",1)
+	  .text(function(d){
+	  	return (d);
+	  });
+
+dataset=[];
+d3.csv("./ForestFires.csv",function(d){
+	return{
+		month: d.month,
+		wind: +d.wind,
+		area: +d.area
+	};
+},function(err,rows){
+	if (err) console.log(err);
+	dataset=rows;
+	visual();
+});
+
+var visual = function(){
+
+xScale=d3.scale.linear()
+			 	  .domain([0,d3.max(dataset,function(d){return d.wind;})])
+			 	  .range([0,w]);
+
+yScale=d3.scale.log()
+				  .domain([d3.min(dataset,function(d){return d.area;}),d3.max(dataset,function(d){return d.area;})])
+				  .range([h,-1]);//let the smaller y be the bottom
+
+var xAxis=d3.svg.axis()
+				.scale(xScale)
+				.orient("bottom");
+			//.tickFormat(formatAsPercentage);
+
+var yAxis=d3.svg.axis()
+				.scale(yScale)
+				.orient("left");
+
+
+ svg.append("g")
+ 	.attr("class","axis")
+ 	.attr("transform", "translate(0,"+h+")")
+ 	.attr("stroke-width",2)
+ 	.call(xAxis);
+
+svg.append("g")
+   .attr("class","axis")
+   .attr("transform","translate(0,0)")
+   .attr('stroke-width',2 )
+   .call(yAxis);
+
+ svg.append("text")
+ 	.attr("x",4)
+ 	.attr("y",0)
+ 	.text("burnt area");
+
+ svg.append("text")
+ 	.attr("x",w-15)
+ 	.attr("y",h+20)
+ 	.text("wind speed");
+
+
+
+svg.selectAll("circle")
+   .data(dataset)
+   .enter()
+   .append("circle")
+   .attr("cx",function(d){return xScale(d.wind);})
+   .attr("cy",function(d){return yScale(d.area);})
+   .attr("r",function(d){
+   	return Math.sqrt(d.area);
+   })
+   .attr("fill",function(d){
+   	return (month(d.month));
+   });
+ };
+
+
+</script>
+
+</html>

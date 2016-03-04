@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>SANKEY Experiment</title>
+
+<head>
+<link rel="stylesheet" type="text/css" href="style.css"></link>
+</head>
+
+<body>
+<div id='slider' style="width:850"></div>
+<div id='graph'></div>
+
+<p id="chart">
+<script src="d3/d3.v3.js"></script>
+<style type="text/css"> //highlight the connection lines
+    path:hover{
+        stroke-opacity: 0.9;
+    }
+</style>
+<script src="sankey.js"></script>
+<script type="text/javascript" src='../lib/d3/d3.slider.js'></script>
+<script type="text/javascript" src='../lib/d3/d3.tip.v0.6.3.js'></script>
+<script>
+    
+var units = "Refugee";
+
+var margin={top:30, right:100, bottom:10, left:70},
+    w=1000-margin.left-margin.right,
+    h=700-margin.top-margin.bottom;
+
+var formatNumber = d3.format(",.0f"),//zero decimal places
+    format = function(d) { return formatNumber(d) + " " + units; },
+    color = d3.scale.category20();
+
+var svg=d3.select("body")
+      .append("svg")
+      .attr("width",w+margin.left+margin.right)
+      .attr("height",h+margin.top+margin.bottom)
+      .append("g")
+      .attr("transform","translate("+margin.left+","+margin.top+")");
+
+// define sankey
+var sankey = d3.sankey()
+        .nodeWidth(40) //node horizon width
+        .nodePadding(10)  //interval between nodes
+        .size([w, h])  //sankey's area
+        .layout(3);
+
+var path = sankey.link();//generate the path
+
+//add tip
+var tip = d3.tip()
+            .attr('class','d3-tip')
+            .html(function(d){
+              return "<span>"+d.source.name+"to"+d.target.name+":"+d.value+"</span>";
+            });
+
+svg.call(tip);
+///add tip
+
+var dataset=[], nest=[], node=[], link=[], slider;
+
+//load data
+d3.json("poc.json", function(error, data) {
+        if(error) throw error;
+        dataset = data.map(d => ({ 
+          Year : d["Year"], Origin: d["Origin"], Asylum: d["Country / territory of asylum/residence"],
+          Refugees: +d["Refugees (incl. refugee-like situations)"]
+        } ));
+ 
+//add nodes to data 
+nest = d3.nest()
+    .key(d => d["Year"])
+    .key(d => d["Origin"])
+    .key(d => d["Asylum"])
+    .entries(dataset);
+
+//add slider
+slider = d3.slider().axis(true).min(2005).max(2014).step(1).on("slideend",visual);
+d3.select("#slider").call(slider);
+//add slider
+
+visual();
+});
+
+function visual(){
+
+//remove the old data
+console.log("new chart");
+//var selectedYear = "2005";
+var selectedYear=slider.value();
+if(node.length||link.length) {
+   node.remove();
+   link.remove();
+}
+ 
+var s = new Set(), i=0, nodes = [], links = [], encode = {},array=[];
+selectedYear=slider.value();//slide to year
+
+dataset.forEach(d => (s.add(d.Asylum),s.add(d.Origin)));
+s.forEach(d => (nodes.push({node:i,name:d}),encode[d] = i, i++));
+nodes.sort((a,b) => (a.node - b.node));
+//construct links
+var dataYear = nest.filter(d => d.key == selectedYear)[0];
+var n1 = dataYear.values.map(d => d.values.map(g => ({source : encode[d.key], target : encode[g.key], value : g.values.map(t => t.Refugees)[0]})));
+  n1.forEach(d => d.forEach(g => links.push(g)));
+
+sankey
+    .nodes(nodes)
+    .links(links)
+    .layout(0);
+
+//add links
+link = svg.append("g")
+           .selectAll(".link")
+           .data(links)
+           .enter()
+           .append("path")
+           .attr("class", "link")
+           .attr("d", path)
+           .style("stroke-width", function(d) { return Math.max(1, d.dy); })
+           .on("mouseover",tip.show)
+           .on("mouseout",tip.hide);
+
+//add links title
+  link.append("title")
+      .text(function(d) {
+            return d.source.name+" → "+d.target.name+"\n"+format(d.value); });
+
+//add nodes
+  node = svg.append("g")
+            .selectAll(".node")
+            .data(nodes)
+            .enter()
+            .append("g")
+            .attr("class", "node")
+            .attr("transform", function(d) { 
+              return "translate("+d.x+","+d.y+")"; 
+            })
+            .call(d3.behavior.drag()
+            .origin(function(d){return d;})
+            .on("dragstart", function() { 
+                this.parentNode.appendChild(this);
+            })
+            .on("drag", dragmove));
+
+//add rectangulars
+node.append("rect")
+    .attr({
+    height: function(d){return d.dy;},
+    width: sankey.nodeWidth(),
+    fill: function(d) { 
+          return d.color = color(d.name.replace(/ .*/, "")); }
+        });
+
+//add nodes title
+  node.append("text")
+      .attr("x",-6)
+      .attr("y",function(d) {
+       return d.dy / 2; 
+      })
+      .attr("dy",".35em")
+      .attr("text-anchor","end")
+      .attr("transform",null)
+      .text(function(d) {
+       return d.name; 
+     })
+      .filter(function(d) { 
+       return d.x < w/ 2; 
+     })
+      .attr("x",6+sankey.nodeWidth())
+      .attr("text-anchor","start");
+
+//drag response function
+  function dragmove(d) {
+    d3.select(this).attr(
+      "transform","translate("+d.x+","+(d.y=Math.max(0,Math.min(h-d.dy,d3.event.y)))+")");
+    sankey.relayout();
+    link.attr("d", path);
+  }
+
+  
+};
+
+</script>
+
+</body>
+</html>

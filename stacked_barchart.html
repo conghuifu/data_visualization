@@ -1,0 +1,148 @@
+<html>
+<meta charset="utf-8">
+
+<head>
+
+</head>
+<style type="text/css">
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+</style>
+<body>
+</body>
+<script src="d3/d3.v3.js"></script>
+<script>
+
+var margin={top:70, right:100, bottom:100, left:100},
+    w=1000-margin.left-margin.right,
+    h=600-margin.top-margin.bottom;
+
+var SquareLength=20;
+var SquareSpace=5;
+var svg=d3.select("body")
+		  .append("svg")
+		  .attr("width",w+margin.left+margin.right)
+		  .attr("height",h+margin.top+margin.bottom)
+		  .append("g")
+		  .attr("transform","translate("+margin.left+","+margin.top+")");
+
+var xScale = d3.scale.ordinal()
+   					 .rangeRoundBands([0, w], .1);//it is nomial
+
+var yScale = d3.scale.linear()
+   					 .rangeRound([h, 0]);
+
+var xAxis=d3.svg.axis()
+				.scale(xScale)
+				.orient("bottom");
+			  //.tickFormat(formatAsPercentage);
+
+var yAxis=d3.svg.axis()
+				.scale(yScale)
+				.orient("left");
+
+var color=["#DB7093","#CD5C5C","#D3D3D3","#FFD700","#FF00FF"];
+
+var yearc=d3.scale.ordinal()
+				  .domain(["2007","2008","2009","2010","2011"])
+				  .range(color);
+
+var legend=svg.selectAll(".legend")
+			  .data(yearc.domain())
+			  .enter()
+			  .append("g")
+			  .attr("class","legend")
+			  .attr("transform",function(d,i){ return "translate("+(w+SquareLength-80) +","+ (i*(SquareLength+SquareSpace)) + ")";});
+
+legend.append("rect")
+	  .attr("width",SquareLength)
+	  .attr("height",SquareLength)
+	  .style("fill",function(d){
+	  	return yearc(d);
+	  });
+
+legend.append("text")
+	  .attr("x",SquareLength+SquareSpace)
+	  .attr("y",SquareSpace+SquareLength-10)
+	  .attr('stroke',"black" )
+	  .attr("stroke-width",1)
+	  .text(function(d){
+	  	return (d);
+	  });
+
+
+dataset=[];
+
+d3.csv('nepal_new.csv',function(error,data){
+  if(error) throw error;
+  data = data.slice(3,12);
+  yearc.domain(d3.keys(data[0]).filter(function(d){return d != "District";}));
+
+  data.forEach(function(d) {
+    var y0 = 0;
+    d.cumsum = yearc.domain().map(function(year){ return {year: year, y0: y0, y1: y0 += +d[year]}; });
+    d.total = d.cumsum[d.cumsum.length - 1].y1;
+  });
+
+  data.sort(function(a, b) { return b.total - a.total; });
+
+  xScale.domain(data.map(function(d) { return d.District; }));
+  yScale.domain([0, d3.max(data, function(d) { return d.total; })]); 
+
+svg.append("g")
+   .attr("class", "x axis")
+   .attr("transform", "translate(0," + h + ")")
+   .call(xAxis);
+
+svg.append("g")
+   .attr("class", "y axis")
+   .call(yAxis)
+   .append("text")
+   .attr("transform", "rotate(-90)")
+   .attr("y", 6)
+   .attr("dy", ".71em")
+   .style("text-anchor", "end")
+   .text("total")
+   .attr("x",-h/2)
+   .attr("y",-70)
+   .attr('stroke',"black" )
+   .attr("stroke-width",1);
+
+svg.append("text")
+   .attr("x",w/2)
+   .attr('y',h+40)
+   .text("District")
+   .attr('font-size',12 )
+   .attr('stroke',"black" )
+   .attr("stroke-width",1);
+
+var District = svg.selectAll(".District")
+      			  .data(data)
+    			  .enter()
+    			  .append("g")
+     			  .attr("class", "g")
+     	          .attr("transform", function(d) { return "translate(" + xScale(d.District) + ",0)"; });
+
+District.selectAll("rect")
+		.data(function(d){return d.cumsum;})
+		.enter()
+		.append("rect")
+		.attr('y', function(d){return yScale(d.y1);})
+		.attr('width', xScale.rangeBand())
+		.attr('height', function(d){return yScale(d.y0)-yScale(d.y1);})
+		.style('fill', function(d){return yearc(d.year);});
+});
+
+
+</script>
+
+</html>
